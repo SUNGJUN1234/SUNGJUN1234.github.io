@@ -1,31 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <!-- viewport : web page가 pc의 web browser에서 뿐만아니라 mobile에서도 문제
-                    없이 표시 가능하도록 도와준다 -->
-    <meta value="viewport" content="width-device-width,inital-scale=1">
-    <link rel="stylesheet" href="index.css">
-    <!-- js를 module type으로 가져온 이유 : three.js 라이브러리를
-                    모듈버전으로 import하기 위해서 -->
-    <!-- defer : 페이지가 모두 로딩된 이후에 자바 스크립트가 실행되도록 하는 장치 -->
-    <title>GIS Developer's Three.js Tutorials</title>
-</head>
-<body>
-    <div id="webgl-container"></div>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
-            }
-        }
-    </script>
-
-
-    <script type="module" defer>
-
-import * as THREE from 'three';
+import * as THREE from "../build/three.module.js";
 
 class App{
 
@@ -135,8 +108,3 @@ window.onload = function(){
 
 
 
-
-
-    </script>
-</body>
-</html>
