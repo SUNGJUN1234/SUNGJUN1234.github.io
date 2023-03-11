@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "gh-pages": "^5.0.0",
+    "homepage": "http://sungjun1234.github.io/SUNGJUN1234.github.io"
+  },
+  "scripts": { 
+    "predeploy": "npm run build", 
+    "deploy": "gh-pages -d build" 
+}
+}
