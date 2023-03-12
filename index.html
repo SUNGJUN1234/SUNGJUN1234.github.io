@@ -1,165 +1,279 @@
 <!DOCTYPE html>
-<html>
-<head>
-
-    <meta value="viewport" content="width-device-width,inital-scale=1">
-    <style type="text/css">
-        * {
-    outline: none;
-    margin: 0;
+<html lang="en">
+	<head>
+		<title>three.js webgl - custom attributes [lines]</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style type="text/css">
+      * {
+  outline: none;
+  margin: 0;
 }
 
 body {
-    overflow: hidden;
+  overflow: hidden;
 }
 
 #webgl-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 
 #controls{
-    display: flex;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 100px;
-    gap: 1em;
+  display: flex;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 100px;
+  gap: 1em;
 }
 
 .button{
-    cursor: pointer;
-    background-color: rgba(0, 0, 0, 0.795);
-    color : white;
-    font-size: 1em;
-    border-radius: 0.5em;
-    border : 2px solid white;
-    padding: 1em 0.5em;
+  cursor: pointer;
+  background-color: rgba(0, 0, 0, 0.795);
+  color : white;
+  font-size: 1em;
+  border-radius: 0.5em;
+  border : 2px solid white;
+  padding: 1em 0.5em;
 }
-    </style>
+  </style>
+	</head>
 
-    <title>GIS Developer's Three.js Tutorials</title>
-</head>
-<body>
-    <div id="webgl-container"></div>
+	<body>
 
-    <script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+		<div id="container"></div>
 
-    <script type="module" defer>
+		<script type="x-shader/x-vertex" id="vertexshader">
 
-class App{
+			uniform float amplitude;
 
+			attribute vec3 displacement;
+			attribute vec3 customColor;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				vec3 newPosition = position + amplitude * displacement;
+
+				vColor = customColor;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform vec3 color;
+			uniform float opacity;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				gl_FragColor = vec4( vColor * color, opacity );
+
+			}
+
+		</script>
+
+		<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+
+		<script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/three/examples/js/geometries/TextGeometry.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/FontLoader.js"></script>
+
+
+
+		<script type="module">
+
+
+			let renderer, scene, camera;
+
+			let line,line2, uniforms;
+
+			const loader = new THREE.FontLoader();
+			loader.load( 'fonts/helvetiker_bold.typeface.json', function ( font ) {
+
+				init( font );
+				animate();
+
+			} );
+
+			function init( font ) {
+
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 10000 );
+				camera.position.z = 1000;
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x050505 );
+
+				uniforms = {
+
+					amplitude: { value: 5.0 },
+					opacity: { value: 0.3 },
+					color: { value: new THREE.Color( 0xffffff ) }
+
+				};
+
+				const shaderMaterial = new THREE.ShaderMaterial( {
+
+					uniforms: uniforms,
+					vertexShader: document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+					blending: THREE.AdditiveBlending,
+					depthTest: false,
+					transparent: true
+
+				} );
+
+                
+
+                
+
+				const geometry = new THREE.TextGeometry( 'Sung-Jun', {
+
+					font: font,
+
+					size: 50,
+					height: 15,
+					curveSegments: 10,
+
+					bevelThickness: 5,
+					bevelSize: 1.5,
+					bevelEnabled: true,
+					bevelSegments: 10,
+
+				} );
+
+                const geometry2 = new THREE.TextGeometry( 'Portfolio', {
+
+                    font: font,
+
+                    size: 50,
+                    height: 15,
+                    curveSegments: 10,
+
+                    bevelThickness: 5,
+                    bevelSize: 1.5,
+                    bevelEnabled: true,
+                    bevelSegments: 10,
+
+                } );
+
+               
+
+				geometry.center();
+				geometry2.center();
+
+				const count = geometry.attributes.position.count;
+				const count2 = geometry2.attributes.position.count;
+
+				const displacement = new THREE.Float32BufferAttribute( count * 3, 3 );
+				geometry.setAttribute( 'displacement', displacement );
+				const displacement2 = new THREE.Float32BufferAttribute( count2 * 3, 3 );
+				geometry2.setAttribute( 'displacement', displacement2 );
+
+				const customColor = new THREE.Float32BufferAttribute( count * 3, 3 );
+				geometry.setAttribute( 'customColor', customColor );
+				geometry2.setAttribute( 'customColor', customColor );
+
+				const color = new THREE.Color( 0xffffff );
+
+				for ( let i = 0, l = customColor.count; i < l; i ++ ) {
+
+					color.setHSL( i / l, 0.5, 0.5 );
+					color.toArray( customColor.array, i * customColor.itemSize );
+
+				}
+
+				line = new THREE.Line( geometry, shaderMaterial );
+				line.rotation.x = 0.2;
+                line.position.y+=30;
+
+                line2 = new THREE.Line( geometry2, shaderMaterial);
+                line2.rotation.x = 0.2;
+                line2.position.y-=30;
+
+				scene.add( line );
+                scene.add( line2 );
+
+            
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				const container = document.getElementById( 'container' );
+				container.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+
+                new THREE.OrbitControls(camera,container);
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+          
+
+			}
+
+         
+
+
+			function render() {
+
+
+				const time = Date.now() * 0.001;
+
+				line.rotation.y = 0.25 * time;
+				line2.rotation.y = 0.25 * time;
+
+				uniforms.amplitude.value = Math.sin( 0.5 * time );
+				uniforms.color.value.offsetHSL( 0.0005, 0, 0 );
+
+				const attributes = line.geometry.attributes;
+				const array = attributes.displacement.array;
 
     
-    constructor() {
-        const divContainer = document.querySelector("#webgl-container");
+				// for ( let i = 0, l = array.length; i < l; i += 3 ) {
 
-        this._divContainer = divContainer;
+				// 	array[ i ] += 0.3 * ( 0.5 - Math.random() );
+				// 	array[ i + 1 ] += 0.3 * ( 0.5 - Math.random() );
+				// 	array[ i + 2 ] += 0.3 * ( 0.5 - Math.random() );
 
+				// }
 
-        const renderer = new THREE.WebGLRenderer({antialias:true});
+				attributes.displacement.needsUpdate = true;
 
-        renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.render( scene, camera );
 
-        divContainer.appendChild(renderer.domElement);
-
-        this._renderer = renderer; 
-
-
-        const scene = new THREE.Scene();
-
-        this._scene = scene;
+			}
 
 
-        this._setupCamera();
-        this._setupLight();
-        this._setupModel();
-        this._setupControls();
+		</script>
 
-        window.onresize = this.resize.bind(this);
-        this.resize();
-
-
-        requestAnimationFrame(this.render.bind(this));
-    }
-    _setupControls(){
-        new THREE.OrbitControls(this._camera,this._divContainer);
-    }
-
-
-    _setupCamera(){
-
-        const width = this._divContainer.clientWidth;
-        const height = this._divContainer.clientHeight;
-
-        const camera = new THREE.PerspectiveCamera(
-            75,
-            width / height,
-            0.1,
-            100
-        );
-        camera.position.z = 2;
-        this._camera = camera;
-    }
-
-  
-    _setupLight(){
-        const color = 0xffffff;
-        const intensity = 1;
-        const light = new THREE.DirectionalLight(color,intensity);
-        light.position.set(-1, 2, 4);
-        this._scene.add(light);
-    }
-
-    _setupModel(){
-
-        const geometry = new THREE.BoxGeometry(1,1,1);
-
-        const Material = new THREE.MeshPhongMaterial({color: 0x44a88});
-
-        const cube = new THREE.Mesh(geometry,Material);
-
-        this._scene.add(cube)
-
-        this._cube = cube;
-    }
-
-    resize(){
-
-        const width = this._divContainer.clientWidth;
-        const height = this._divContainer.clientHeight;
-
-        this._camera.aspect = width / height;
-        this._camera.updateProjectionMatrix();
-
-        this._renderer.setSize(width,height);
-    }
-    
-    render(time){
-
-        this._renderer.render(this._scene, this._camera);
-
-        this.update(time);
-        requestAnimationFrame(this.render.bind(this));
-    }
-
-    update(time){
-        time *= 0.001; 
-        this._cube.rotation.x = time;
-        this._cube.rotation.y = time;
-    }
-
-}
-
-window.onload = function(){
-    new App();
-}
-
-
-    </script>
 </body>
+
 </html>
