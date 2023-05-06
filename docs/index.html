@@ -1,592 +1,253 @@
 <!DOCTYPE html>
-<html lang="en">
-	<head>
-		<title>three.js - misc - octree collisions</title>
-		<meta charset=utf-8 />
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<style>
-			body {
-	margin: 0;
-	background-color: #000;
-	color: #fff;
-	font-family: Monospace;
-	font-size: 13px;
-	line-height: 24px;
-	overscroll-behavior: none;
+<html>
+<head>
+    <!-- viewport : web page가 pc의 web browser에서 뿐만아니라 mobile에서도 문제
+                    없이 표시 가능하도록 도와준다 -->
+    <meta value="viewport" content="width-device-width,inital-scale=1">
+    <link rel="stylesheet" href="portfolio.css">
+    <!-- OrbitControls이 필요로 하는 three.js 라이브러리의 참조 방식이 변경되어 추가 작성해줘야 하는 코드-->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "../build/three.module.js"
+            }
+        }
+    </script>
+    <!-- js를 module type으로 가져온 이유 : three.js 라이브러리를
+                    모듈버전으로 import하기 위해서 -->
+    <!-- defer : 페이지가 모두 로딩된 이후에 자바 스크립트가 실행되도록 하는 장치 -->
+    <script type="module" src="portfolio.js" defer></script>
+    
+    <title>GIS Developer's Three.js Tutorials</title>
+    <style>
+        *{
+    outline :none;
+    margin : 0;
 }
 
-a {
-	color: #ff0;
-	text-decoration: none;
+body{
+    /* 만약 스크롤바가 생길 경우 스크롤바 숨기기 */
+    overflow: hidden;
 }
 
-a:hover {
-	text-decoration: underline;
+#webgl-container{
+    /* 해당 div를 화면에 꽉차게 설정 */
+    position: absolute;
+    top:0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+    </style>
+</head>
+<body>
+    <div id="webgl-container"></div>
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+import { OrbitControls } from "three/addons/controls/OrbitControls.js"
+import {FBXLoader} from "three/addons/loaders/FBXLoader.js"
+
+
+class App{
+  
+    constructor() {
+      
+        const divContainer = document.querySelector("#webgl-container");
+        this._divContainer = divContainer;
+
+        const renderer = new THREE.WebGLRenderer({antialias:true});
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0xffa500); // 배경색 설정
+        divContainer.appendChild(renderer.domElement);
+        this._renderer = renderer;
+
+        const scene = new THREE.Scene();
+        this._scene = scene;
+        
+        this._setupCamera();
+        this._setupAudio();
+        this._setupLight();
+        this._setupModel();
+        this._setupControls();
+        this._clock = new THREE.Clock();
+
+        window.onresize = this.resize.bind(this);
+        this.resize();
+
+        requestAnimationFrame(this.render.bind(this));
+
+    }
+
+    _setupAudio() {
+        const listener = new THREE.AudioListener();
+        this._camera.add(listener); // 카메라에 추가합니다.
+    
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load('data/beat.mp3', (buffer) => {
+          const audio = new THREE.Audio(listener);
+          audio.setBuffer(buffer);
+          audio.setLoop(true); // 반복 재생 설정
+          audio.setVolume(0.5); // 볼륨 설정
+          audio.play(); // 재생 시작
+        });
+      }
+
+      _setupControls(){
+        this._controls = new OrbitControls(this._camera, this._renderer.domElement);
+    }
+    _setupCamera(){
+        const width = this._divContainer.clientWidth;
+        const height = this._divContainer.clientHeight;
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            width / height,
+            0.1,
+            100
+        );
+        camera.position.z = 2;
+        this._camera = camera;
+    }
+    _setupLight(){
+        const color = 0xffffff;
+        const intensity = 1;
+        const light = new THREE.DirectionalLight(color, intensity);
+        
+        // 네 개의 위치를 배열로 정의합니다.
+        const positions = [
+          new THREE.Vector3(-1, 2, 4),
+          new THREE.Vector3(1, 2, 4),
+          new THREE.Vector3(-1, 2, -4),
+          new THREE.Vector3(1, 2, -4),
+        ];
+        
+        // 네 개의 위치에 각각 Object3D를 생성하여 light를 추가합니다.
+        positions.forEach((position) => {
+          const obj = new THREE.Object3D();
+          obj.position.copy(position);
+          obj.add(light.clone());
+          this._scene.add(obj);
+        });
+    }
+
+    _zoomFit(object3D, camera, viewMode, bFront){
+        const box = new THREE.Box3().setFromObject(object3D);
+        const sizeBox = box.getSize(new THREE.Vector3()).length();
+        const centerBox = box.getCenter(new THREE.Vector3());
+
+        let offsetX = 0, offsetY = 0, offsetZ = 0;
+        viewMode ==="X" ? offsetX = 1 : (viewMode === "Y")?
+            offsetY = 1 : offsetZ = 1;
+
+        if(!bFront){
+            offsetX*=-1;
+            offsetY*=-1;
+            offsetZ*=-1;
+        }
+        camera.position.set(
+            centerBox.x + offsetX, centerBox.y + offsetY, centerBox.z + offsetZ);
+            
+        const halfSizeModel = sizeBox * 0.5;
+        const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+        const distance = halfSizeModel / Math.tan(halfFov);
+        const direction = (new THREE.Vector3()).subVectors(
+            camera.position, centerBox).normalize();
+        const position = direction.multiplyScalar(distance).add(centerBox);
+
+        camera.position.copy(position);
+        camera.near = sizeBox / 100;
+        camera.far = sizeBox * 100;
+
+        camera.updateProjectionMatrix();
+
+        camera.lookAt(centerBox.x, centerBox.y, centerBox.z);
+
+        // 카메라의 위치를 발 끝이 아닌 몸의 중심으로 할 수 있도록 만드는 코드
+        this._controls.target.set(centerBox.x, centerBox.y, centerBox.z);
+    
+    }
+
+
+    _setupModel(){
+       const loader = new FBXLoader();
+       loader.load('data/dancing.fbx', object => {
+        object.traverse(node => {
+          if (node.isMesh) {
+            node.geometry.computeBoundingBox(); // 메시의 크기에 맞게 Box3 객체의 크기 조정
+          }
+        });
+      
+        this._mixer = new THREE.AnimationMixer(object);
+        const action = this._mixer.clipAction(object.animations[0]);
+        action.play();
+      
+        this._scene.add(object);
+              
+        this._zoomFit(object, this._camera, "Z", true);
+      
+        this._clock = new THREE.Clock();
+      
+        this._cleanUp = () => {
+          this._mixer.stopAllAction();
+          this._mixer.uncacheRoot(object);
+        };
+      });
+
+  
+    }
+
+    resize(){
+        const width = this._divContainer.clientWidth;
+        const height = this._divContainer.clientHeight;
+
+        if (this._cleanUp) {
+            this._cleanUp();
+            this._cleanUp = null;
+        }
+
+        this._camera.aspect = width / height;
+        this._camera.updateProjectionMatrix();
+
+        this._renderer.setSize(width,height);
+    }
+ 
+    render(time){
+        this._renderer.render(this._scene, this._camera);
+        this.update(time);
+    
+        setTimeout(() => {
+            this.render();
+        }, 16);
+    }
+    
+    update(time){
+        time *= 0.001;
+
+        // 애니메이션이 경과된 시간을 설정해주는 장치
+        const delta = this._clock.getDelta();
+        if(this._mixer) this._mixer.update(delta);
+    }
+
 }
 
-button {
-	cursor: pointer;
-	text-transform: uppercase;
+window.onload = function(){
+    new App();
 }
 
-#info {
-	position: absolute;
-	top: 0px;
-	width: 100%;
-	padding: 10px;
-	box-sizing: border-box;
-	text-align: center;
-	-moz-user-select: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-	user-select: none;
-	pointer-events: none;
-	z-index: 1; /* TODO Solve this in HTML */
-}
 
-a, button, input, select {
-	pointer-events: auto;
-}
 
-.lil-gui {
-	z-index: 2 !important; /* TODO Solve this in HTML */
-}
 
-@media all and ( max-width: 640px ) {
-	.lil-gui.root { 
-		right: auto;
-		top: auto;
-		max-height: 50%;
-		max-width: 80%;
-		bottom: 0;
-		left: 0;
-	}
-}
 
-#overlay {
-	position: absolute;
-	font-size: 16px;
-	z-index: 2;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-direction: column;
-	background: rgba(0,0,0,0.7);
-}
-
-	#overlay button {
-		background: transparent;
-		border: 0;
-		border: 1px solid rgb(255, 255, 255);
-		border-radius: 4px;
-		color: #ffffff;
-		padding: 12px 18px;
-		text-transform: uppercase;
-		cursor: pointer;
-	}
-
-#notSupported {
-	width: 50%;
-	margin: auto;
-	background-color: #f00;
-	margin-top: 20px;
-	padding: 10px;
-}
-
-		</style>
-	</head>
-	<body>
-		<div id="info">
-			<br/>
-			성준 포트폴리오 준비중<br/>
-			이동 : WASD <br/>
-			점프 : SPACE
-		</div>
-		<div id="container"></div>
-
-		<!-- Import maps polyfill -->
-		<!-- Remove this when import maps will be widely supported -->
-		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
-
-		<script type="importmap">
-			{
-				"imports": {
-					"three": "https://unpkg.com/three@0.150.1/build/three.module.js",
-					"three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
-				}
-			}
-		</script>
-
-		<script type="module">
-			import * as THREE from 'three';
-
-			import Stats from 'three/addons/libs/stats.module.js';
-
-			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-			import { Octree } from 'three/addons/math/Octree.js';
-			import { OctreeHelper } from 'three/addons/helpers/OctreeHelper.js';
-
-			import { Capsule } from 'three/addons/math/Capsule.js';
-
-			import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-
-			const clock = new THREE.Clock();
-
-			const scene = new THREE.Scene();
-			scene.background = new THREE.Color( 0x88ccee );
-			scene.fog = new THREE.Fog( 0x88ccee, 0, 50 );
-
-			const camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.1, 1000 );
-			camera.rotation.order = 'YXZ';
-
-			const fillLight1 = new THREE.HemisphereLight( 0x4488bb, 0x002244, 0.5 );
-			fillLight1.position.set( 2, 1, 1 );
-			scene.add( fillLight1 );
-
-			const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.8 );
-			directionalLight.position.set( - 5, 25, - 1 );
-			directionalLight.castShadow = true;
-			directionalLight.shadow.camera.near = 0.01;
-			directionalLight.shadow.camera.far = 500;
-			directionalLight.shadow.camera.right = 30;
-			directionalLight.shadow.camera.left = - 30;
-			directionalLight.shadow.camera.top	= 30;
-			directionalLight.shadow.camera.bottom = - 30;
-			directionalLight.shadow.mapSize.width = 1024;
-			directionalLight.shadow.mapSize.height = 1024;
-			directionalLight.shadow.radius = 4;
-			directionalLight.shadow.bias = - 0.00006;
-			scene.add( directionalLight );
-
-			const container = document.getElementById( 'container' );
-
-			const renderer = new THREE.WebGLRenderer( { antialias: true } );
-			renderer.setPixelRatio( window.devicePixelRatio );
-			renderer.setSize( window.innerWidth, window.innerHeight );
-			renderer.shadowMap.enabled = true;
-			renderer.shadowMap.type = THREE.VSMShadowMap;
-			renderer.outputEncoding = THREE.sRGBEncoding;
-			renderer.toneMapping = THREE.ACESFilmicToneMapping;
-			container.appendChild( renderer.domElement );
-
-			const stats = new Stats();
-			stats.domElement.style.position = 'absolute';
-			stats.domElement.style.top = '0px';
-			container.appendChild( stats.domElement );
-
-			const GRAVITY = 30;
-
-			const NUM_SPHERES = 100;
-			const SPHERE_RADIUS = 0.2;
-
-			const STEPS_PER_FRAME = 5;
-
-			const sphereGeometry = new THREE.IcosahedronGeometry( SPHERE_RADIUS, 5 );
-			const sphereMaterial = new THREE.MeshLambertMaterial( { color: 0xbbbb44 } );
-
-			const spheres = [];
-			let sphereIdx = 0;
-
-			for ( let i = 0; i < NUM_SPHERES; i ++ ) {
-
-				const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
-				sphere.castShadow = true;
-				sphere.receiveShadow = true;
-
-				scene.add( sphere );
-
-				spheres.push( {
-					mesh: sphere,
-					collider: new THREE.Sphere( new THREE.Vector3( 0, - 100, 0 ), SPHERE_RADIUS ),
-					velocity: new THREE.Vector3()
-				} );
-
-			}
-
-			const worldOctree = new Octree();
-
-			const playerCollider = new Capsule( new THREE.Vector3( 0, 0.35, 0 ), new THREE.Vector3( 0, 1, 0 ), 0.35 );
-
-			const playerVelocity = new THREE.Vector3();
-			const playerDirection = new THREE.Vector3();
-
-			let playerOnFloor = false;
-			let mouseTime = 0;
-
-			const keyStates = {};
-
-			const vector1 = new THREE.Vector3();
-			const vector2 = new THREE.Vector3();
-			const vector3 = new THREE.Vector3();
-
-			document.addEventListener( 'keydown', ( event ) => {
-
-				keyStates[ event.code ] = true;
-
-			} );
-
-			document.addEventListener( 'keyup', ( event ) => {
-
-				keyStates[ event.code ] = false;
-
-			} );
-
-			container.addEventListener( 'mousedown', () => {
-
-				document.body.requestPointerLock();
-
-				mouseTime = performance.now();
-
-			} );
-
-			document.addEventListener( 'mouseup', () => {
-
-				if ( document.pointerLockElement !== null ) throwBall();
-
-			} );
-
-			document.body.addEventListener( 'mousemove', ( event ) => {
-
-				if ( document.pointerLockElement === document.body ) {
-
-					camera.rotation.y -= event.movementX / 500;
-					camera.rotation.x -= event.movementY / 500;
-
-				}
-
-			} );
-
-			window.addEventListener( 'resize', onWindowResize );
-
-			function onWindowResize() {
-
-				camera.aspect = window.innerWidth / window.innerHeight;
-				camera.updateProjectionMatrix();
-
-				renderer.setSize( window.innerWidth, window.innerHeight );
-
-			}
-
-			function throwBall() {
-
-				const sphere = spheres[ sphereIdx ];
-
-				camera.getWorldDirection( playerDirection );
-
-				sphere.collider.center.copy( playerCollider.end ).addScaledVector( playerDirection, playerCollider.radius * 1.5 );
-
-				// throw the ball with more force if we hold the button longer, and if we move forward
-
-				const impulse = 15 + 30 * ( 1 - Math.exp( ( mouseTime - performance.now() ) * 0.001 ) );
-
-				sphere.velocity.copy( playerDirection ).multiplyScalar( impulse );
-				sphere.velocity.addScaledVector( playerVelocity, 2 );
-
-				sphereIdx = ( sphereIdx + 1 ) % spheres.length;
-
-			}
-
-			function playerCollisions() {
-
-				const result = worldOctree.capsuleIntersect( playerCollider );
-
-				playerOnFloor = false;
-
-				if ( result ) {
-
-					playerOnFloor = result.normal.y > 0;
-
-					if ( ! playerOnFloor ) {
-
-						playerVelocity.addScaledVector( result.normal, - result.normal.dot( playerVelocity ) );
-
-					}
-
-					playerCollider.translate( result.normal.multiplyScalar( result.depth ) );
-
-				}
-
-			}
-
-			function updatePlayer( deltaTime ) {
-
-				let damping = Math.exp( - 4 * deltaTime ) - 1;
-
-				if ( ! playerOnFloor ) {
-
-					playerVelocity.y -= GRAVITY * deltaTime;
-
-					// small air resistance
-					damping *= 0.1;
-
-				}
-
-				playerVelocity.addScaledVector( playerVelocity, damping );
-
-				const deltaPosition = playerVelocity.clone().multiplyScalar( deltaTime );
-				playerCollider.translate( deltaPosition );
-
-				playerCollisions();
-
-				camera.position.copy( playerCollider.end );
-
-			}
-
-			function playerSphereCollision( sphere ) {
-
-				const center = vector1.addVectors( playerCollider.start, playerCollider.end ).multiplyScalar( 0.5 );
-
-				const sphere_center = sphere.collider.center;
-
-				const r = playerCollider.radius + sphere.collider.radius;
-				const r2 = r * r;
-
-				// approximation: player = 3 spheres
-
-				for ( const point of [ playerCollider.start, playerCollider.end, center ] ) {
-
-					const d2 = point.distanceToSquared( sphere_center );
-
-					if ( d2 < r2 ) {
-
-						const normal = vector1.subVectors( point, sphere_center ).normalize();
-						const v1 = vector2.copy( normal ).multiplyScalar( normal.dot( playerVelocity ) );
-						const v2 = vector3.copy( normal ).multiplyScalar( normal.dot( sphere.velocity ) );
-
-						playerVelocity.add( v2 ).sub( v1 );
-						sphere.velocity.add( v1 ).sub( v2 );
-
-						const d = ( r - Math.sqrt( d2 ) ) / 2;
-						sphere_center.addScaledVector( normal, - d );
-
-					}
-
-				}
-
-			}
-
-			function spheresCollisions() {
-
-				for ( let i = 0, length = spheres.length; i < length; i ++ ) {
-
-					const s1 = spheres[ i ];
-
-					for ( let j = i + 1; j < length; j ++ ) {
-
-						const s2 = spheres[ j ];
-
-						const d2 = s1.collider.center.distanceToSquared( s2.collider.center );
-						const r = s1.collider.radius + s2.collider.radius;
-						const r2 = r * r;
-
-						if ( d2 < r2 ) {
-
-							const normal = vector1.subVectors( s1.collider.center, s2.collider.center ).normalize();
-							const v1 = vector2.copy( normal ).multiplyScalar( normal.dot( s1.velocity ) );
-							const v2 = vector3.copy( normal ).multiplyScalar( normal.dot( s2.velocity ) );
-
-							s1.velocity.add( v2 ).sub( v1 );
-							s2.velocity.add( v1 ).sub( v2 );
-
-							const d = ( r - Math.sqrt( d2 ) ) / 2;
-
-							s1.collider.center.addScaledVector( normal, d );
-							s2.collider.center.addScaledVector( normal, - d );
-
-						}
-
-					}
-
-				}
-
-			}
-
-			function updateSpheres( deltaTime ) {
-
-				spheres.forEach( sphere => {
-
-					sphere.collider.center.addScaledVector( sphere.velocity, deltaTime );
-
-					const result = worldOctree.sphereIntersect( sphere.collider );
-
-					if ( result ) {
-
-						sphere.velocity.addScaledVector( result.normal, - result.normal.dot( sphere.velocity ) * 1.5 );
-						sphere.collider.center.add( result.normal.multiplyScalar( result.depth ) );
-
-					} else {
-
-						sphere.velocity.y -= GRAVITY * deltaTime;
-
-					}
-
-					const damping = Math.exp( - 1.5 * deltaTime ) - 1;
-					sphere.velocity.addScaledVector( sphere.velocity, damping );
-
-					playerSphereCollision( sphere );
-
-				} );
-
-				spheresCollisions();
-
-				for ( const sphere of spheres ) {
-
-					sphere.mesh.position.copy( sphere.collider.center );
-
-				}
-
-			}
-
-			function getForwardVector() {
-
-				camera.getWorldDirection( playerDirection );
-				playerDirection.y = 0;
-				playerDirection.normalize();
-
-				return playerDirection;
-
-			}
-
-			function getSideVector() {
-
-				camera.getWorldDirection( playerDirection );
-				playerDirection.y = 0;
-				playerDirection.normalize();
-				playerDirection.cross( camera.up );
-
-				return playerDirection;
-
-			}
-
-			function controls( deltaTime ) {
-
-				// gives a bit of air control
-				const speedDelta = deltaTime * ( playerOnFloor ? 25 : 8 );
-
-				if ( keyStates[ 'KeyW' ] ) {
-
-					playerVelocity.add( getForwardVector().multiplyScalar( speedDelta ) );
-
-				}
-
-				if ( keyStates[ 'KeyS' ] ) {
-
-					playerVelocity.add( getForwardVector().multiplyScalar( - speedDelta ) );
-
-				}
-
-				if ( keyStates[ 'KeyA' ] ) {
-
-					playerVelocity.add( getSideVector().multiplyScalar( - speedDelta ) );
-
-				}
-
-				if ( keyStates[ 'KeyD' ] ) {
-
-					playerVelocity.add( getSideVector().multiplyScalar( speedDelta ) );
-
-				}
-
-				if ( playerOnFloor ) {
-
-					if ( keyStates[ 'Space' ] ) {
-
-						playerVelocity.y = 15;
-
-					}
-
-				}
-
-			}
-
-			const loader = new GLTFLoader().setPath( './models/gltf/' );
-
-			loader.load( 'collision-world.glb', ( gltf ) => {
-
-				scene.add( gltf.scene );
-
-				worldOctree.fromGraphNode( gltf.scene );
-
-				gltf.scene.traverse( child => {
-
-					if ( child.isMesh ) {
-
-						child.castShadow = true;
-						child.receiveShadow = true;
-
-						if ( child.material.map ) {
-
-							child.material.map.anisotropy = 4;
-
-						}
-
-					}
-
-				} );
-
-				const helper = new OctreeHelper( worldOctree );
-				helper.visible = false;
-				scene.add( helper );
-
-				const gui = new GUI( { width: 200 } );
-				gui.add( { debug: false }, 'debug' )
-					.onChange( function ( value ) {
-
-						helper.visible = value;
-
-					} );
-
-				animate();
-
-			} );
-
-			function teleportPlayerIfOob() {
-
-				if ( camera.position.y <= - 25 ) {
-
-					playerCollider.start.set( 0, 0.35, 0 );
-					playerCollider.end.set( 0, 1, 0 );
-					playerCollider.radius = 0.35;
-					camera.position.copy( playerCollider.end );
-					camera.rotation.set( 0, 0, 0 );
-
-				}
-
-			}
-
-
-			function animate() {
-
-				const deltaTime = Math.min( 0.05, clock.getDelta() ) / STEPS_PER_FRAME;
-
-				// we look for collisions in substeps to mitigate the risk of
-				// an object traversing another too quickly for detection.
-
-				for ( let i = 0; i < STEPS_PER_FRAME; i ++ ) {
-
-					controls( deltaTime );
-
-					updatePlayer( deltaTime );
-
-					updateSpheres( deltaTime );
-
-					teleportPlayerIfOob();
-
-				}
-
-				renderer.render( scene, camera );
-
-				stats.update();
-
-				requestAnimationFrame( animate );
-
-			}
-
-		</script>
-	</body>
+    </script>
+</body>
 </html>
