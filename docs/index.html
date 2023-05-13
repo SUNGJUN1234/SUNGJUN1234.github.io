@@ -73,7 +73,7 @@ let move_camera_position;
 let wheelEnabled = true;
 class App{
   
-    constructor() {
+     constructor() {
   
 
 
@@ -94,6 +94,7 @@ class App{
         this._setupLight();
         this._setupModel();
         this._setupEventListeners();
+        this._createProgressBar(); // 프로그레스 바 생성
         this._clock = new THREE.Clock();
 
         window.onresize = this.resize.bind(this);
@@ -102,6 +103,98 @@ class App{
         requestAnimationFrame(this.render.bind(this));
 
     }
+
+    _zoomFit(object3D, camera, viewMode, bFront){
+      const box = new THREE.Box3().setFromObject(object3D);
+      const sizeBox = box.getSize(new THREE.Vector3()).length();
+      const centerBox = box.getCenter(new THREE.Vector3());
+
+      let offsetX = 0, offsetY = 0, offsetZ = 0;
+      viewMode ==="X" ? offsetX = 1 : (viewMode === "Y")?
+          offsetY = 1 : offsetZ = 1;
+
+      if(!bFront){
+          offsetX*=-1;
+          offsetY*=-1;
+          offsetZ*=-1;
+      }
+      camera.position.set(
+          centerBox.x + offsetX, centerBox.y + offsetY, centerBox.z + offsetZ);
+          
+      const halfSizeModel = sizeBox * 0.5;
+      const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+      const distance = halfSizeModel / Math.tan(halfFov);
+      const direction = (new THREE.Vector3()).subVectors(
+          camera.position, centerBox).normalize();
+      const position = direction.multiplyScalar(distance).add(centerBox);
+
+      camera.position.copy(position);
+      camera.near = sizeBox / 100;
+      camera.far = sizeBox * 100;
+
+      camera.updateProjectionMatrix();
+
+      camera.lookAt(centerBox.x, centerBox.y, centerBox.z);
+
+      // 카메라의 위치를 발 끝이 아닌 몸의 중심으로 할 수 있도록 만드는 코드
+
+      first_camera_position = this._camera.position;
+          console.log(first_camera_position)
+  }
+
+
+  _setupModel(){
+      const loader = new FBXLoader();
+      loader.load('data/dancing.fbx', object => {
+          object.traverse(node => {
+              if (node.isMesh) {
+                  node.geometry.computeBoundingBox(); // 메시의 크기에 맞게 Box3 객체의 크기 조정
+              }
+          });
+  
+          this._mixer = new THREE.AnimationMixer(object);
+          const action = this._mixer.clipAction(object.animations[0]);
+          action.play();
+  
+          this._scene.add(object);
+  
+          this._zoomFit(object, this._camera, "Z", true);
+  
+          this._clock = new THREE.Clock();
+  
+          this._cleanUp = () => {
+              this._mixer.stopAllAction();
+              this._mixer.uncacheRoot(object);
+          };
+      }, (xhr) => {
+        // 로딩 진행 상황 업데이트
+        const percent = (xhr.loaded / xhr.total) * 100;
+        this._progressBar.style.width = percent + "%";
+        if(percent == 100){
+          setTimeout(() => {
+       
+            this._progressBar.style.display ="none";
+          }, 2000);
+
+        }
+
+    });;
+  }
+  _createProgressBar() {
+    const progressBar = document.createElement("div");
+    progressBar.style.width = "0%";
+    progressBar.style.height = "100%";
+    progressBar.style.backgroundColor = "blue";
+    progressBar.style.position = "fixed";
+    progressBar.style.top = "0";
+    progressBar.style.left = "0";
+    progressBar.style.zIndex = "9999";
+    document.body.appendChild(progressBar);
+    this._progressBar = progressBar;
+}
+
+
+
     _setupEventListeners() {
         // 마우스 스크롤 이벤트 리스너 추가
         window.addEventListener('wheel', this._handleMouseScroll.bind(this));
@@ -204,70 +297,7 @@ class App{
         });
     }
 
-    _zoomFit(object3D, camera, viewMode, bFront){
-        const box = new THREE.Box3().setFromObject(object3D);
-        const sizeBox = box.getSize(new THREE.Vector3()).length();
-        const centerBox = box.getCenter(new THREE.Vector3());
 
-        let offsetX = 0, offsetY = 0, offsetZ = 0;
-        viewMode ==="X" ? offsetX = 1 : (viewMode === "Y")?
-            offsetY = 1 : offsetZ = 1;
-
-        if(!bFront){
-            offsetX*=-1;
-            offsetY*=-1;
-            offsetZ*=-1;
-        }
-        camera.position.set(
-            centerBox.x + offsetX, centerBox.y + offsetY, centerBox.z + offsetZ);
-            
-        const halfSizeModel = sizeBox * 0.5;
-        const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
-        const distance = halfSizeModel / Math.tan(halfFov);
-        const direction = (new THREE.Vector3()).subVectors(
-            camera.position, centerBox).normalize();
-        const position = direction.multiplyScalar(distance).add(centerBox);
-
-        camera.position.copy(position);
-        camera.near = sizeBox / 100;
-        camera.far = sizeBox * 100;
-
-        camera.updateProjectionMatrix();
-
-        camera.lookAt(centerBox.x, centerBox.y, centerBox.z);
-
-        // 카메라의 위치를 발 끝이 아닌 몸의 중심으로 할 수 있도록 만드는 코드
-
-        first_camera_position = this._camera.position;
-            console.log(first_camera_position)
-    }
-
-
-    _setupModel(){
-        const loader = new FBXLoader();
-        loader.load('data/dancing.fbx', object => {
-            object.traverse(node => {
-                if (node.isMesh) {
-                    node.geometry.computeBoundingBox(); // 메시의 크기에 맞게 Box3 객체의 크기 조정
-                }
-            });
-    
-            this._mixer = new THREE.AnimationMixer(object);
-            const action = this._mixer.clipAction(object.animations[0]);
-            action.play();
-    
-            this._scene.add(object);
-    
-            this._zoomFit(object, this._camera, "Z", true);
-    
-            this._clock = new THREE.Clock();
-    
-            this._cleanUp = () => {
-                this._mixer.stopAllAction();
-                this._mixer.uncacheRoot(object);
-            };
-        });
-    }
 
     resize(){
         const width = this._divContainer.clientWidth;
@@ -315,12 +345,16 @@ window.onload = function(){
 
 
 
+
+
+
+
+
     </script>
 
     <script type="module">
 // 오디오 요소 생성
 var audio = new Audio('./data/beat.mp3');
-audio.play();
 
 // 재생 버튼 클릭 시
 document.getElementById('play_button').addEventListener('click', function() {
